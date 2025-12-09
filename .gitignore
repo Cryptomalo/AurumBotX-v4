@@ -1,7 +1,41 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
 
-# Runtime files
-bot.pid
-bot_output.log
-hyperliquid_trading/
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
 logs/
 monitoring_reports/
+
+# Trading data
+hyperliquid_trading/
+demo_trading/
+*.json.bak
+
+# Bot runtime
+bot.pid
+bot_output.log

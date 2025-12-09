@@ -1,0 +1,7 @@
+
+# Runtime files
+bot.pid
+bot_output.log
+hyperliquid_trading/
+logs/
+monitoring_reports/

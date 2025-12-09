@@ -1,0 +1,35 @@
+{
+  "wallet_name": "hyperliquid_testnet_10k",
+  "initial_capital": 10000.00,
+  "trading_pairs": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "ARB",
+    "AVAX",
+    "MATIC"
+  ],
+  "min_confidence": 60.0,
+  "take_profit_pct": 8.0,
+  "stop_loss_pct": 2.0,
+  "max_holding_hours": 24,
+  "max_daily_trades": 12,
+  "max_consecutive_losses": 5,
+  "daily_loss_limit_pct": 10.0,
+  "emergency_stop_loss_pct": 30.0,
+  "position_sizing": {
+    "TURTLE": 0.02,
+    "RABBIT": 0.04,
+    "CHEETAH": 0.06,
+    "LION": 0.08,
+    "WHALE": 0.10
+  },
+  "level_thresholds": {
+    "RABBIT": 10500,
+    "CHEETAH": 11000,
+    "LION": 12000,
+    "WHALE": 15000
+  },
+  "hyperliquid_testnet": true,
+  "notes": "Hyperliquid Testnet - Paper Trading with Real Market Data"
+}

@@ -16,6 +16,7 @@ from hyperliquid.exchange import Exchange
 from hyperliquid.utils import constants
 from eth_account import Account
 
+
 # Configuration
 CONFIG_FILE = sys.argv[1] if len(sys.argv) > 1 else "config/hyperliquid_testnet_10k.json"
 STATE_DIR = os.getenv("STATE_DIR", "./hyperliquid_trading")
@@ -167,14 +168,28 @@ def detect_trend(price_data):
     else:
         return "SIDEWAYS"
 
-def ai_analysis(pair, price_data, trend):
+def ai_analysis(pair, price_data, trend, trade_history):
     """AI-powered trading decision"""
     try:
         client = OpenAI(
             api_key=os.getenv("OPENAI_API_KEY")
         )
         
-        prompt = f"""You are a crypto trading analyst. Analyze this data and provide a trading recommendation.
+        # Formatta la cronologia degli ultimi 5 trade per l'AI
+        recent_trades = trade_history[-5:]
+        history_text = "Nessun trade precedente registrato."
+        if recent_trades:
+            history_text = "Cronologia degli ultimi trade (dal più vecchio al più recente):\n"
+            for trade in recent_trades:
+                history_text += f"- {trade['timestamp'][:10]} {trade['pair']} {trade['action']} @ ${trade['price']:.2f} (Conf: {trade['confidence']:.1f}%) - Ragione: {trade['reasoning']}\n"
+        
+        prompt = f"""You are an ultra-resilient crypto trading analyst. Your goal is to learn from past mistakes and improve your confidence in the current decision.
+        
+{history_text}
+
+Analizza la cronologia dei trade. Se i trade precedenti con bassa confidenza o ragioni specifiche hanno fallito, usa questa informazione per aumentare la soglia di confidenza o modificare la tua raccomandazione.
+
+Analizza i seguenti dati di mercato e fornisci una raccomandazione di trading.
 
 Pair: {pair}
 Current Price: ${price_data['price']:,.2f}
@@ -183,15 +198,17 @@ Current Price: ${price_data['price']:,.2f}
 24h Low: ${price_data['low_24h']:,.2f}
 Trend: {trend}
 
-Provide:
+Fornisci SOLO la risposta nel formato esatto: ACTION|CONFIDENCE|REASONING.
+Non includere testo aggiuntivo, introduzioni o spiegazioni al di fuori del formato.
+
 1. Action: BUY, SELL, or HOLD
-2. Confidence: 0-100%
-3. Reasoning: Brief explanation
+2. Confidence: 0-100% (Aumenta la confidenza se la tua analisi attuale è in linea con i trade di successo passati o se correggi un errore passato)
+3. Reasoning: Breve spiegazione che includa un riferimento a come la cronologia dei trade ha influenzato la tua decisione.
 
 Format: ACTION|CONFIDENCE|REASONING"""
 
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gemini-2.5-flash",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
             temperature=0.3
@@ -275,7 +292,7 @@ def execute_cycle():
         log(f"📈 Trend: {trend}")
         
         # AI analysis
-        analysis = ai_analysis(pair, price_data, trend)
+        analysis = ai_analysis(pair, price_data, trend, state["trade_history"])
         if not analysis:
             log(f"❌ AI analysis failed for {pair}")
             continue

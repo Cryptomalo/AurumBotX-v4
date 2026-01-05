@@ -12,9 +12,11 @@ import os
 from datetime import datetime, timedelta
 from openai import OpenAI
 from hyperliquid.info import Info
+import pandas as pd
 from hyperliquid.exchange import Exchange
 from hyperliquid.utils import constants
 from eth_account import Account
+import ta
 
 
 # Configuration
@@ -60,8 +62,8 @@ def load_state(config):
     # Initialize new state
     return {
         "wallet_name": config["wallet_name"],
-        "initial_capital": config["initial_capital"],
-        "current_capital": config["initial_capital"],
+        "initial_capital": config.get("initial_capital", 10000.0),
+        "current_capital": config.get("initial_capital", 10000.0),
         "current_level": "TURTLE",
         "total_trades": 0,
         "winning_trades": 0,
@@ -103,6 +105,23 @@ def get_hyperliquid_exchange(account_address, secret_key, testnet=True):
     account = Account.from_key(secret_key)
     
     return Exchange(account, api_url)
+
+def get_historical_data(info, symbol, interval="1h", limit=14):
+    """Get historical klines (candles) from Hyperliquid (simulated)."""
+    # NOTE: Hyperliquid SDK used here doesn't provide klines. This is a simulation.
+    # In a real bot, use a dedicated data provider (e.g., CCXT) to get actual historical data.
+    data = {
+        'close': [87000, 87100, 87200, 87300, 87400, 87500, 87600, 87550, 87450, 87350, 87250, 87150, 87050, 87200]
+    }
+    df = pd.DataFrame(data)
+    return df
+
+def calculate_rsi(df, window=14):
+    """Calculate RSI using the 'ta' library."""
+    if len(df) < window:
+        return None
+    rsi = ta.momentum.RSIIndicator(df['close'], window=window).rsi()
+    return rsi.iloc[-1]
 
 def get_live_price(info, symbol):
     """Get live price from Hyperliquid"""
@@ -168,7 +187,7 @@ def detect_trend(price_data):
     else:
         return "SIDEWAYS"
 
-def ai_analysis(pair, price_data, trend, trade_history):
+def ai_analysis(pair, price_data, trend, trade_history, rsi_value):
     """AI-powered trading decision"""
     try:
         client = OpenAI(
@@ -190,13 +209,16 @@ def ai_analysis(pair, price_data, trend, trade_history):
 Analizza la cronologia dei trade. Se i trade precedenti con bassa confidenza o ragioni specifiche hanno fallito, usa questa informazione per aumentare la soglia di confidenza o modificare la tua raccomandazione.
 
 Analizza i seguenti dati di mercato e fornisci una raccomandazione di trading.
+Considera l'RSI come un indicatore di ipercomprato (>70) o ipervenduto (<30). Se l'RSI è estremo, aumenta la confidenza solo se il trend è forte e la cronologia dei trade supporta la continuazione.
+
+Includi esplicitamente un'analisi del "Sentiment" (es. Cauto, Neutrale, Ottimista) nel tuo ragionamento.
 
 Pair: {pair}
 Current Price: ${price_data['price']:,.2f}
 24h Change: {price_data['change_24h']:.2f}%
 24h High: ${price_data['high_24h']:,.2f}
 24h Low: ${price_data['low_24h']:,.2f}
-Trend: {trend}
+Trend: {trend}\nRSI (14 Periodi): {rsi_value:.2f}
 
 Fornisci SOLO la risposta nel formato esatto: ACTION|CONFIDENCE|REASONING.
 Non includere testo aggiuntivo, introduzioni o spiegazioni al di fuori del formato.
@@ -291,8 +313,18 @@ def execute_cycle():
         trend = detect_trend(price_data)
         log(f"📈 Trend: {trend}")
         
-        # AI analysis
-        analysis = ai_analysis(pair, price_data, trend, state["trade_history"])
+        # Technical Analysis (RSI)
+        historical_data = get_historical_data(info, pair)
+        rsi_value = calculate_rsi(historical_data)
+        
+        if rsi_value is None:
+            log(f"⚠️ Insufficient historical data for RSI on {pair} - skipping.", "WARNING")
+            continue
+            
+        log(f"📊 RSI (14): {rsi_value:.2f}")
+        
+        # AI analysis with RSI and Sentiment
+        analysis = ai_analysis(pair, price_data, trend, state["trade_history"], rsi_value)
         if not analysis:
             log(f"❌ AI analysis failed for {pair}")
             continue
@@ -324,16 +356,48 @@ def execute_cycle():
         log(f"   Price: ${price_data['price']:,.2f}")
         log(f"   📝 NOTE: Testnet paper trading - no real funds at risk")
         
-        # Update state
+        # Calcola la dimensione della posizione (Position Sizing)
+        # Rischio massimo per trade: 1% del capitale corrente
+        risk_per_trade_pct = 0.01
+        
+        # Calcola la quantità di trade in USD (es. 1% del capitale)
+        trade_size_usd = state["current_capital"] * risk_per_trade_pct
+        
+        # Calcola la quantità in unità di criptovaluta
+        # Assumiamo che la dimensione della posizione sia in USD per semplicità
+        # In un bot reale, si userebbe la leva e il margine
+        quantity = trade_size_usd / price_data['price']
+        
+        # Arrotonda la quantità alla precisione supportata dall'exchange (qui simuliamo 4 decimali)
+        quantity = round(quantity, 4)
+        
+        if quantity * price_data['price'] < 1.0: # Minimo trade in USD
+            log(f"⚠️ Quantità calcolata troppo bassa ({quantity:.4f} {pair}) - trade saltato.", "WARNING")
+            continue
+        
+        # Esegui trade (simulato per testnet paper trading)
+        log(f"✅ TRADE SIGNAL: {analysis['action']} {pair}")
+        log(f"   Confidenza: {analysis['confidence']:.1f}%")
+        log(f"   Prezzo: ${price_data['price']:,.2f}")
+        log(f"   Dimensione Posizione (USD): ${trade_size_usd:,.2f}")
+        log(f"   Quantità ({pair}): {quantity:.4f}")
+        log(f"   📝 NOTE: Testnet paper trading - no real funds at risk")
+        
+        # Aggiorna stato
         state["daily_trades"] += 1
         state["total_trades"] += 1
         
-        # Record trade
+        # Simula l'impatto sul capitale (per ora 0)
+        # In un bot reale, il capitale verrebbe aggiornato solo alla chiusura del trade
+        
+        # Registra trade
         trade_record = {
             "timestamp": datetime.now().isoformat(),
             "pair": pair,
             "action": analysis["action"],
             "price": price_data['price'],
+            "quantity": quantity,
+            "trade_size_usd": trade_size_usd,
             "confidence": analysis['confidence'],
             "reasoning": analysis['reasoning'],
             "trend": trend

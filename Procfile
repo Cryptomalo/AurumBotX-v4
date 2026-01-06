@@ -1,1 +1,1 @@
-worker: python3 src/wallet_runner_hyperliquid.py
+worker: python src/wallet_runner_hyperliquid.py

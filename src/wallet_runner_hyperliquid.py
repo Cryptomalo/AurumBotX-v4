@@ -201,36 +201,31 @@ def ai_analysis(pair, price_data, trend, trade_history, rsi_value):
             history_text = "Cronologia degli ultimi trade (dal più vecchio al più recente):\n"
             for trade in recent_trades:
                 history_text += f"- {trade['timestamp'][:10]} {trade['pair']} {trade['action']} @ ${trade['price']:.2f} (Conf: {trade['confidence']:.1f}%) - Ragione: {trade['reasoning']}\n"
-        
-        prompt = f"""You are an ultra-resilient crypto trading analyst. Your goal is to learn from past mistakes and improve your confidence in the current decision.
-        
+             prompt = f"""
+Analizza i seguenti dati di mercato e la cronologia dei trade. Fornisci una raccomandazione di trading (BUY o HOLD) e una confidenza (0-100%).
+
+**Dati di Mercato:**
+- Pair: {pair}
+- Current Price: ${price_data["price"]:,.2f}
+- 24h Change: {price_data["change_24h"]:+.2f}%
+- 24h High: ${price_data["high_24h"]:,.2f}
+- 24h Low: ${price_data["low_24h"]:,.2f}
+- Trend: {trend}
+- RSI (14 Periodi): {rsi_value:.2f}
+
+**Cronologia dei Trade Recenti (ultimi 5):**
 {history_text}
 
-Analizza la cronologia dei trade. Se i trade precedenti con bassa confidenza o ragioni specifiche hanno fallito, usa questa informazione per aumentare la soglia di confidenza o modificare la tua raccomandazione.
+**Considerazioni per la Decisione:**
+- **Apprendimento dagli Errori**: Se i trade precedenti con bassa confidenza o ragioni specifiche hanno fallito, usa questa informazione per aumentare la soglia di confidenza o modificare la tua raccomandazione.
+- **RSI**: Se RSI è > 70 (ipercomprato), l\'azione deve essere HOLD. Se RSI è < 30 (ipervenduto), è un potenziale segnale di acquisto, ma deve essere confermato da un trend rialzista o laterale e da una volatilità moderata.
+- **Volatilità**: Una bassa volatilità (cambiamento 24h vicino allo 0%) suggerisce un mercato laterale, dove è preferibile HOLD.
+- **Sentiment**: Includi esplicitamente un\'analisi del "Sentiment" (es. Cauto, Neutrale, Ottimista) nel tuo ragionamento.
 
-Analizza i seguenti dati di mercato e fornisci una raccomandazione di trading.
-Considera l'RSI come un indicatore di ipercomprato (>70) o ipervenduto (<30). Se l'RSI è estremo, aumenta la confidenza solo se il trend è forte e la cronologia dei trade supporta la continuazione.
-
-Includi esplicitamente un'analisi del "Sentiment" (es. Cauto, Neutrale, Ottimista) nel tuo ragionamento.
-
-Pair: {pair}
-Current Price: ${price_data['price']:,.2f}
-24h Change: {price_data['change_24h']:.2f}%
-24h High: ${price_data['high_24h']:,.2f}
-24h Low: ${price_data['low_24h']:,.2f}
-Trend: {trend}\nRSI (14 Periodi): {rsi_value:.2f}
-
-Fornisci SOLO la risposta nel formato esatto: ACTION|CONFIDENCE|REASONING.
-Non includere testo aggiuntivo, introduzioni o spiegazioni al di fuori del formato.
-
-1. Action: BUY, SELL, or HOLD
-2. Confidence: 0-100% (Aumenta la confidenza se la tua analisi attuale è in linea con i trade di successo passati o se correggi un errore passato)
-3. Reasoning: Breve spiegazione che includa un riferimento a come la cronologia dei trade ha influenzato la tua decisione.
-
-Format: ACTION|CONFIDENCE|REASONING"""
-
+Fornisci SOLO la risposta nel formato JSON valido contenente \'action\' (BUY/HOLD), \'confidence\' (0-100%) e \'reasoning\' (spiegazione dettagliata della decisione basata sui dati e le regole).
+"""
         response = client.chat.completions.create(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash", # Aggiornato al modello più recente e performante
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
             temperature=0.3
